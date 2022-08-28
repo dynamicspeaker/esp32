@@ -1,33 +1,36 @@
+#include "AudioConfigLocal.h"
 #include "BluetoothA2DPSink.h"
+#include "AudioTools.h"
 
 BluetoothA2DPSink a2dp_sink;
+SPDIFStream spdif;
+
+// Write data to SPDIF in callback
+void read_data_stream(const uint8_t *data, uint32_t length) {
+    spdif.write(data, length);
+}
 
 void setup() {
-    pinMode(2, OUTPUT);
-    digitalWrite(2, HIGH);
-    static const i2s_config_t i2s_config = {
-        .mode = (i2s_mode_t) (I2S_MODE_SLAVE | I2S_MODE_TX),
-        .sample_rate = 44100, // corrected by info from bluetooth
-        .bits_per_sample = (i2s_bits_per_sample_t) I2S_BITS_PER_SAMPLE_32BIT, /* the DAC module will only take the 8bits from MSB */
-        .channel_format = I2S_CHANNEL_FMT_RIGHT_LEFT,
-        .communication_format = (i2s_comm_format_t) I2S_COMM_FORMAT_STAND_I2S,
-        .intr_alloc_flags = 0, // default interrupt priority
-        .dma_buf_count = 8,
-        .dma_buf_len = 64,
-        .use_apll = true
+  Serial.begin(115200);
+  AudioLogger::instance().begin(Serial, AudioLogger::Warning);
+  
+  // register callback
+  a2dp_sink.set_stream_reader(read_data_stream, false);
 
-    };
-    i2s_pin_config_t my_pin_config = {
-        .bck_io_num = 26,
-        .ws_io_num = 25,
-        .data_out_num = 21,
-        .data_in_num = I2S_PIN_NO_CHANGE
-    };
-    a2dp_sink.set_i2s_config(i2s_config);
-    a2dp_sink.set_pin_config(my_pin_config);
-    a2dp_sink.start("MyMusic");
+  // Start Bluetooth Audio Receiver
+  a2dp_sink.set_auto_reconnect(false);
+  a2dp_sink.start("a2dp-spdif");
+
+  // setup output
+  auto cfg = spdif.defaultConfig();
+  cfg.pin_data = 23;
+  cfg.sample_rate = a2dp_sink.sample_rate();
+  cfg.channels = 2;
+  cfg.bits_per_sample = 16;
+  spdif.begin(cfg);
 
 }
 
 void loop() {
+  delay(100);
 }
